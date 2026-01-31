@@ -84,7 +84,7 @@ def run_detr_train(
     if pretrained_model_path:
         try:
             model.load_state_dict(
-                torch.load(pretrained_model_path, map_location=device)
+                torch.load(pretrained_model_path, map_location=device), strict=False
             )
             print(f"✅ Loaded pretrained model from {pretrained_model_path}")
         except Exception as e:

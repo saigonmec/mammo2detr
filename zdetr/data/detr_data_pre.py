@@ -320,7 +320,8 @@ def prepare_detr_dataframe(
         print(f"\n📊 DETR Preprocessing (Vectorized):")
         print(f"  Input: {len(df)} annotations")
     # Loại bỏ bbox quá lớn
-    df = remove_large_bboxes(df, area_ratio_thresh=0.9)
+    # df = remove_large_bboxes(df, area_ratio_thresh=0.9)
+    print(f"  After removing large bboxes: {len(df)} annotations")
 
     # Group bboxes using vectorized operations
     df_grouped = group_bboxes_by_image_vectorized(
@@ -423,6 +424,22 @@ def prepare_detr_from_metadata(
 
     # Load raw metadata
     df_raw = pd.read_csv(metadata_path)
+
+    # THEN ensure required columns exist (copy if needed and available)
+    if "image_width" in df_raw.columns:
+        if "img_width" not in df_raw.columns:
+            df_raw["img_width"] = df_raw["image_width"]
+
+    if "image_height" in df_raw.columns:
+        if "img_height" not in df_raw.columns:
+            df_raw["img_height"] = df_raw["image_height"]
+
+    if "image_path" in df_raw.columns:
+        if "link" not in df_raw.columns:
+            df_raw["link"] = df_raw["image_path"]
+    elif "link" in df_raw.columns:
+        if "image_path" not in df_raw.columns:
+            df_raw["image_path"] = df_raw["link"]
 
     if verbose:
         print(f"📂 Loading: {metadata_path}")

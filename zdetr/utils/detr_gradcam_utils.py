@@ -82,6 +82,22 @@ def _detect_vit_grid_size(model, input_h, input_w):
 
         return False, None, None
 
+    # --- MambaVision detection ---
+    # MambaVision có downsample ở mỗi level: input/4, input/8, input/16, input/32
+    # Level 3 (cuối) thường là input/32
+    if hasattr(model, "backbone") and hasattr(model.backbone, "base_model"):
+        if hasattr(model.backbone.base_model, "model") and hasattr(
+            model.backbone.base_model.model, "levels"
+        ):
+            # Đây là MambaVision structure
+            # Level 0: /4, Level 1: /8, Level 2: /16, Level 3: /32
+            grid_h = input_h // 32
+            grid_w = input_w // 32
+            print(
+                f"[DEBUG] Detected MambaVision: grid_size = {grid_h}x{grid_w} (input: {input_h}x{input_w})"
+            )
+            return True, grid_h, grid_w
+
     # Case 1: model.transformer.patch_embed (DinoVisionTransformerClassifier wrapper)
     if hasattr(model, "transformer") and hasattr(model.transformer, "patch_embed"):
         return get_grid_from_patch_embed(model.transformer.patch_embed)
@@ -236,6 +252,96 @@ def gradcam(
         handle_b.remove()
 
 
+def _get_mamba_gradcam_layer(model, model_name, has_backbone):
+    """
+    Tìm layer phù hợp cho GradCAM trong MambaVision models.
+    Ưu tiên các layer có output 4D (conv blocks) để tránh vấn đề reshape.
+
+    Args:
+        model: The model instance
+        model_name: Model architecture name (e.g., 'mamba_t', 'mamba_s')
+        has_backbone: Whether model has backbone wrapper
+
+    Returns:
+        str: Layer name for GradCAM
+    """
+    prefix = "backbone." if has_backbone else ""
+
+    print(f"\n{'=' * 60}")
+    print(f"DEBUG: MambaVision GradCAM Layer Detection")
+    print(f"Model: {model_name}")
+    print(f"Has backbone wrapper: {has_backbone}")
+    print(f"{'=' * 60}\n")
+
+    named_modules = dict([*model.named_modules()])
+
+    # Strategy 1: Downsample layers (output 4D: [B, C, H, W])
+    print("[Strategy 1] Looking for downsample layers...")
+    downsample_layers = [
+        k for k in named_modules if "downsample" in k and "reduction" in k
+    ]
+    if downsample_layers:
+        # Lấy downsample cuối cùng (level 2 -> level 3)
+        selected = downsample_layers[-1]
+        print(f"✓ Found downsample layer: {selected}")
+        print(f"  Output shape: 4D [B, C, H, W] (no reshape needed)")
+        print(f"{'=' * 60}\n")
+        return f"{prefix}{selected}" if not selected.startswith(prefix) else selected
+
+    # Strategy 2: Conv blocks trong level 0, 1 (output 4D)
+    print("[Strategy 2] Looking for conv blocks in level 0, 1...")
+    conv_blocks = [
+        k
+        for k in named_modules
+        if ("levels.0.blocks" in k or "levels.1.blocks" in k) and k.endswith("norm2")
+    ]
+    if conv_blocks:
+        selected = sorted(conv_blocks)[-1]
+        print(f"✓ Found conv block: {selected}")
+        print(f"  Output shape: 4D [B, C, H, W] (no reshape needed)")
+        print(f"{'=' * 60}\n")
+        return f"{prefix}{selected}" if not selected.startswith(prefix) else selected
+
+    # Strategy 3: Last conv layer in level 1
+    print("[Strategy 3] Looking for last conv layer in level 1...")
+    level1_convs = [k for k in named_modules if "levels.1.blocks" in k and "conv" in k]
+    if level1_convs:
+        selected = sorted(level1_convs)[-1]
+        print(f"✓ Found level 1 conv: {selected}")
+        print(f"  Output shape: 4D [B, C, H, W] (no reshape needed)")
+        print(f"{'=' * 60}\n")
+        return f"{prefix}{selected}" if not selected.startswith(prefix) else selected
+
+    # Strategy 4: Mamba/Attention blocks (output 3D, cần reshape)
+    print("[Strategy 4] Looking for Mamba/Attention blocks (requires reshape)...")
+    mamba_blocks = [
+        k for k in named_modules if "levels" in k and "blocks" in k and "norm1" in k
+    ]
+    if mamba_blocks:
+        # Lấy block cuối của level cao nhất
+        def extract_level_block(name):
+            import re
+
+            level_match = re.search(r"levels\.(\d+)", name)
+            block_match = re.search(r"blocks\.(\d+)", name)
+            level = int(level_match.group(1)) if level_match else -1
+            block = int(block_match.group(1)) if block_match else -1
+            return (level, block)
+
+        sorted_blocks = sorted(mamba_blocks, key=extract_level_block, reverse=True)
+        selected = sorted_blocks[0]
+        print(f"⚠ Found Mamba/Attention block: {selected}")
+        print(f"  Output shape: 3D [B, N, C] (will be reshaped to 4D)")
+        print(f"  Note: Requires grid_size detection for reshape")
+        print(f"{'=' * 60}\n")
+        return f"{prefix}{selected}" if not selected.startswith(prefix) else selected
+
+    # Fallback: feature_proj
+    print(f"[Fallback] Using feature_proj")
+    print(f"{'=' * 60}\n")
+    return f"{prefix}feature_proj"
+
+
 def get_gradcam_layer(model, model_name):
     """
     Return the appropriate layer name for GradCAM based on model_name.
@@ -260,6 +366,10 @@ def get_gradcam_layer(model, model_name):
                 if name.endswith(cand):
                     return name
         return None
+
+    # MambaVision models
+    if "mamba" in model_name:
+        return _get_mamba_gradcam_layer(model, model_name, has_backbone)
 
     # ResNet, ResNeXt, ResNeSt
     if "resnet" in model_name or "resnext" in model_name or "resnest" in model_name:

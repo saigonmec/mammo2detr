@@ -163,7 +163,7 @@ def draw_predicted_bboxes(
     return num_pred_boxes, max_iou
 
 
-def visualize_detr_result(
+def visualize_detr_result_ori(
     image_tensor,
     attn_map,
     pred_bboxes,
@@ -234,6 +234,73 @@ def visualize_detr_result(
             f"GradCAM: {class_names[pred_class]}", fontsize=12, fontweight="bold"
         )
         ax3.axis("off")
+
+    plt.tight_layout()
+    save_path = clean_image_filename(save_path)
+    plt.savefig(save_path, dpi=150, bbox_inches="tight")
+    plt.close()
+
+
+def visualize_detr_result(
+    image_tensor,
+    attn_map,
+    pred_bboxes,
+    pred_obj_scores,
+    gt_bbox_list,
+    pred_class,
+    gt_label,
+    pred_prob,
+    save_path,
+    class_names,
+    original_size,
+    image_path=None,
+    obj_threshold=0.5,
+    use_otsu=False,
+    gradcam_map=None,
+):
+    """Create DETR visualization with GradCAM in panel 2 (instead of attention map)"""
+
+    img_original_np = load_original_image(image_path, original_size, image_tensor)
+    if img_original_np is None:
+        return
+
+    # Prepare GradCAM overlay for panel 2
+    gradcam_blend = None
+    if gradcam_map is not None:
+        gradcam_resized = Image.fromarray(gradcam_map).resize(
+            original_size[::-1], Image.Resampling.BILINEAR
+        )
+        gradcam_np = np.array(gradcam_resized)
+        gradcam_color = plt.cm.jet(gradcam_np / 255.0)[..., :3]
+        gradcam_blend = np.clip(0.6 * img_original_np + 0.4 * gradcam_color, 0, 1)
+    else:
+        # If no GradCAM, use original image
+        gradcam_blend = img_original_np
+
+    # Create 2-panel figure
+    fig, axs = plt.subplots(1, 2, figsize=(16, 8))
+    ax1, ax2 = axs
+
+    # Panel 1: Original image with GT bboxes (same as visualize_detr_result)
+    ax1.imshow(img_original_np)
+    num_valid = draw_bboxes_on_axis(ax1, gt_bbox_list, original_size, "lime")
+    title_left = f"GT: {class_names[gt_label]}"
+    title_left += f" | {num_valid} bbox(es)" if num_valid > 0 else " (No bbox)"
+    ax1.set_title(title_left, fontsize=12, fontweight="bold")
+    ax1.axis("off")
+
+    # Panel 2: GradCAM overlay with predicted bboxes (replaces attention map)
+    ax2.imshow(gradcam_blend)
+    num_pred, max_iou = draw_predicted_bboxes(
+        ax2, pred_bboxes, pred_obj_scores, original_size, gt_bbox_list, obj_threshold
+    )
+    title_right = (
+        f"DETR: {class_names[pred_class]} | {pred_prob:.3f} | Boxes: {num_pred}"
+    )
+    if max_iou > 0:
+        title_right += f" | IoU: {max_iou:.3f}"
+    ax2.set_title(title_right, fontsize=12, fontweight="bold")
+    ax2.axis("off")
 
     plt.tight_layout()
     save_path = clean_image_filename(save_path)

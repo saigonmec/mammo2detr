@@ -26,6 +26,22 @@ def load_image_metadata_with_bboxes(data_folder):
 
     df = pd.read_csv(metadata_path)
 
+    # THEN ensure required columns exist (copy if needed and available)
+    if "image_width" in df.columns:
+        if "img_width" not in df.columns:
+            df["img_width"] = df["image_width"]
+
+    if "image_height" in df.columns:
+        if "img_height" not in df.columns:
+            df["img_height"] = df["image_height"]
+
+    if "image_path" in df.columns:
+        if "link" not in df.columns:
+            df["link"] = df["image_path"]
+    elif "link" in df.columns:
+        if "image_path" not in df.columns:
+            df["image_path"] = df["link"]
+
     # Create bbx column from x, y, width, height
     if all(col in df.columns for col in ["x", "y", "width", "height"]):
         df["bbx"] = df[["x", "y", "width", "height"]].apply(
