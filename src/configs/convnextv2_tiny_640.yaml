@@ -1,0 +1,12 @@
+# ConvNeXt-V2 tiny @ 640x640, multi-scale deformable transformer (strides 8/16/32).
+data:
+  img_size: [640, 640]
+  batch_size: 8
+model:
+  backbone: {name: convnextv2_tiny, out_strides: [8, 16, 32], drop_path_rate: 0.1}
+  transformer: {type: deformable, num_encoder_layers: 3, num_decoder_layers: 6, num_queries: 30, enc_n_points: 4, dec_n_points: 4}
+optim:
+  lr: 1.0e-4
+  backbone_lr_mult: 0.1
+  epochs: 60
+  warmup_epochs: 2

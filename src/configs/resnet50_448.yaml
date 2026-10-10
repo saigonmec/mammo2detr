@@ -1,0 +1,11 @@
+# Fast baseline: ResNet-50 @ 448x448, single-scale (stride 16) standard transformer with conditional attention.
+data:
+  img_size: [448, 448]
+  batch_size: 16
+model:
+  backbone: {name: resnet50, out_strides: [16]}
+  transformer: {type: standard, num_encoder_layers: 3, num_decoder_layers: 6, num_queries: 20}
+optim:
+  lr: 1.0e-4
+  epochs: 50
+  warmup_epochs: 1

@@ -1,0 +1,25 @@
+# Tiny configuration for smoke tests on CPU (synthetic data, see src/tools/make_synthetic_dataset.py).
+seed: 0
+device: cpu
+data:
+  img_size: [128, 128]
+  batch_size: 4
+  num_workers: 0
+  val_fraction: 0.25
+  aug: {affine_p: 0.3, bbox_safe_crop_p: 0.2, clahe_p: 0.0, blur_sharpen_p: 0.0, noise_p: 0.0}
+model:
+  backbone: {name: "timm:resnet18", pretrained: false, out_strides: [32]}
+  transformer: {type: standard, d_model: 64, nhead: 4, num_encoder_layers: 1, num_decoder_layers: 2, dim_feedforward: 128, num_queries: 6}
+  denoising: {num_groups: 2}
+optim:
+  lr: 2.0e-4
+  epochs: 2
+  amp: false
+  warmup_epochs: 0.5
+  ema: {enabled: true, warmup_steps: 5}
+eval:
+  viz_samples: 2
+logging:
+  output_dir: runs_debug
+  log_every: 5
+  save_top_k: 1

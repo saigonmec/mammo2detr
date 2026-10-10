@@ -1,0 +1,11 @@
+# ResNet-50 @ 768x512 using the stride-16 level (finer grid for small lesions), standard attention.
+data:
+  img_size: [768, 512]
+  resize_mode: letterbox
+  batch_size: 8
+model:
+  backbone: {name: resnet50, out_strides: [16]}
+  transformer: {type: standard, num_encoder_layers: 2, num_decoder_layers: 6, num_queries: 30}
+optim:
+  lr: 1.0e-4
+  epochs: 60

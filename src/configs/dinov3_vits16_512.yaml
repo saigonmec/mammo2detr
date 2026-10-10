@@ -1,0 +1,13 @@
+# DINOv3 ViT-S/16 @ 512x512 with a ViTDet-style simple feature pyramid (strides 8/16/32).
+# Only the last 4 blocks of the ViT are trained; the transformer head is trained from scratch.
+data:
+  img_size: [512, 512]
+  batch_size: 8
+model:
+  backbone: {name: dinov3_vit16small, out_strides: [8, 16, 32], unfreeze_last_blocks: 4}
+  transformer: {type: deformable, num_encoder_layers: 3, num_decoder_layers: 6, num_queries: 30}
+optim:
+  lr: 1.0e-4
+  backbone_lr_mult: 0.2
+  epochs: 60
+  warmup_epochs: 2

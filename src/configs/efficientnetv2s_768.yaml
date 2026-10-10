@@ -1,0 +1,11 @@
+# EfficientNetV2-S @ 768x512 letterbox, multi-scale deformable.
+data:
+  img_size: [768, 512]
+  resize_mode: letterbox
+  batch_size: 8
+model:
+  backbone: {name: efficientnetv2s, out_strides: [8, 16, 32]}
+  transformer: {type: deformable, num_encoder_layers: 3, num_decoder_layers: 6, num_queries: 30}
+optim:
+  lr: 1.5e-4
+  epochs: 60
